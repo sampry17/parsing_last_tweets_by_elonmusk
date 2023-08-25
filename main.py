@@ -5,12 +5,7 @@ from config import login, password, proxy_host, proxy_port
 
 async def get_bearer_token(session, proxy_auth):
     headers = {
-        'sec-ch-ua': '"Not.A/Brand";v="8", "Chromium";v="114", "YaBrowser";v="23"',
-        'Referer': 'https://twitter.com/',
-        'Origin': 'https://twitter.com',
-        'sec-ch-ua-mobile': '?0',
         'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 YaBrowser/23.7.1.1215 Yowser/2.5 Safari/537.36',
-        'sec-ch-ua-platform': '"Linux"',
     }
 
     async with session.get(url='https://abs.twimg.com/responsive-web/client-web/main.fbea402a.js', headers=headers,
@@ -22,26 +17,25 @@ async def get_bearer_token(session, proxy_auth):
         return bearer_token
 
 
-async def get_csrf(session, proxy_auth):
+async def get_guest_token(session, proxy_auth, bearer_token):
     headers = {
-        'sec-ch-ua': '"Not.A/Brand";v="8", "Chromium";v="114", "YaBrowser";v="23"',
-        'Referer': 'https://twitter.com/',
-        'Origin': 'https://twitter.com',
-        'sec-ch-ua-mobile': '?0',
         'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 YaBrowser/23.7.1.1215 Yowser/2.5 Safari/537.36',
-        'sec-ch-ua-platform': '"Linux"',
-        'x-guest-token': '1694705288304312320'
+        "accept": "*/*",
+        "accept-language": "de,en-US;q=0.7,en;q=0.3",
+        "accept-encoding": "gzip, deflate, br",
+        "te": "trailers",
+        'authorization': f'Bearer {bearer_token}'
     }
 
-    async with session.get(url='https://twitter.com', headers=headers,
-                           proxy_auth=proxy_auth, proxy=f'http://{proxy_host}:{proxy_port}') as response:
+    async with session.post(url='https://api.twitter.com/1.1/guest/activate.json', headers=headers,
+                            proxy_auth=proxy_auth, proxy=f'http://{proxy_host}:{proxy_port}') as response:
 
-        csrf = str(response.cookies).split(';')[0].split('ct0=')[-1]
+        guest_token = await response.json()
 
-        return csrf
+        return guest_token['guest_token']
 
 
-async def get_last_tweets(session, proxy_auth, bearer_token, csrf_token):
+async def get_last_tweets(session, proxy_auth, bearer_token, guest):
     url = ('https://twitter.com/i/api/graphql/XicnWRbyQ3WgVY__VataBQ/UserTweets?variables=%7B%22userId%22%3A%2244196397%'
            '22%2C%22count%22%3A20%2C%22includePromotedContent%22%3Atrue%2C%22withQuickPromoteEligibilityTweetFields%22%3'
            'Atrue%2C%22withVoice%22%3Atrue%2C%22withV2Timeline%22%3Atrue%7D&features=%7B%22rweb_lists_timeline_redesign_'
@@ -61,18 +55,14 @@ async def get_last_tweets(session, proxy_auth, bearer_token, csrf_token):
         'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 YaBrowser/23.7.1.1215 Yowser/2.5 Safari/537.36',
         'Accept': '*/*',
         'Accept-Language': 'ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3',
-        'x-twitter-active-user': 'yes',
-        'Sec-Fetch-Dest': 'empty',
-        'Sec-Fetch-Mode': 'cors',
-        'Sec-Fetch-Site': 'same-origin',
-        'x-csrf-token': csrf_token,
+        'x-guest-token': guest,
         'authorization': f'Bearer {bearer_token}'
     }
 
     async with session.get(url=url, headers=headers, proxy_auth=proxy_auth,
                            proxy=f'http://{proxy_host}:{proxy_port}') as response:
 
-        json_content = response.json()
+        json_content = await response.json()
 
         info_tweets = json_content['data']['user']['result']['timeline_v2']['timeline']['instructions'][2]['entries']
 
@@ -88,8 +78,8 @@ async def main():
     async with aiohttp.ClientSession(trust_env=True) as session:
         proxy_auth = aiohttp.BasicAuth(login, password)
         bearer = await get_bearer_token(session, proxy_auth)
-        csrf = await get_csrf(session, proxy_auth)
-        tweets = await get_last_tweets(session, proxy_auth, bearer, csrf)
+        guest = await get_guest_token(session, proxy_auth, bearer)
+        tweets = await get_last_tweets(session, proxy_auth, bearer, guest)
 
     for tweet in tweets:
         print(tweet)
