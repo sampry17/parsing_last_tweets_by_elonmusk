@@ -1,14 +1,15 @@
 import asyncio
 import aiohttp
 from config import login, password, proxy_host, proxy_port
+from datetime import datetime
+
+
+def extract_date(date_str):
+    return datetime.strptime(date_str, '%a %b %d %H:%M:%S %z %Y')
 
 
 async def get_bearer_token(session, proxy_auth):
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 YaBrowser/23.7.1.1215 Yowser/2.5 Safari/537.36',
-    }
-
-    async with session.get(url='https://abs.twimg.com/responsive-web/client-web/main.fbea402a.js', headers=headers,
+    async with session.get(url='https://abs.twimg.com/responsive-web/client-web/main.fbea402a.js',
                            proxy_auth=proxy_auth, proxy=f'http://{proxy_host}:{proxy_port}') as response:
 
         page = await response.text()
@@ -19,7 +20,6 @@ async def get_bearer_token(session, proxy_auth):
 
 async def get_guest_token(session, proxy_auth, bearer_token):
     headers = {
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 YaBrowser/23.7.1.1215 Yowser/2.5 Safari/537.36',
         "accept": "*/*",
         "accept-language": "de,en-US;q=0.7,en;q=0.3",
         "accept-encoding": "gzip, deflate, br",
@@ -36,30 +36,28 @@ async def get_guest_token(session, proxy_auth, bearer_token):
 
 
 async def get_last_tweets(session, proxy_auth, bearer_token, guest):
-    url = ('https://twitter.com/i/api/graphql/XicnWRbyQ3WgVY__VataBQ/UserTweets?variables=%7B%22userId%22%3A%2244196397%'
-           '22%2C%22count%22%3A20%2C%22includePromotedContent%22%3Atrue%2C%22withQuickPromoteEligibilityTweetFields%22%3'
-           'Atrue%2C%22withVoice%22%3Atrue%2C%22withV2Timeline%22%3Atrue%7D&features=%7B%22rweb_lists_timeline_redesign_'
-           'enabled%22%3Atrue%2C%22responsive_web_graphql_exclude_directive_enabled%22%3Atrue%2C%22verified_phone_label_'
-           'enabled%22%3Afalse%2C%22creator_subscriptions_tweet_preview_api_enabled%22%3Atrue%2C%22responsive_web_graphq'
-           'l_timeline_navigation_enabled%22%3Atrue%2C%22responsive_web_graphql_skip_user_profile_image_extensions_enabl'
-           'ed%22%3Afalse%2C%22tweetypie_unmention_optimization_enabled%22%3Atrue%2C%22responsive_web_edit_tweet_api_ena'
-           'bled%22%3Atrue%2C%22graphql_is_translatable_rweb_tweet_is_translatable_enabled%22%3Atrue%2C%22view_counts_ev'
-           'erywhere_api_enabled%22%3Atrue%2C%22longform_notetweets_consumption_enabled%22%3Atrue%2C%22responsive_web_tw'
-           'itter_article_tweet_consumption_enabled%22%3Afalse%2C%22tweet_awards_web_tipping_enabled%22%3Afalse%2C%22fre'
-           'edom_of_speech_not_reach_fetch_enabled%22%3Atrue%2C%22standardized_nudges_misinfo%22%3Atrue%2C%22tweet_with_'
-           'visibility_results_prefer_gql_limited_actions_policy_enabled%22%3Atrue%2C%22longform_notetweets_rich_text_re'
-           'ad_enabled%22%3Atrue%2C%22longform_notetweets_inline_media_enabled%22%3Atrue%2C%22responsive_web_media_downl'
-           'oad_video_enabled%22%3Afalse%2C%22responsive_web_enhance_cards_enabled%22%3Afalse%7D')
+    url = 'https://twitter.com/i/api/graphql/XicnWRbyQ3WgVY__VataBQ/UserTweets'
+
+    params = {
+        'variables': '{"userId":"44196397","count":20,"includePromotedContent":true,"withQuickPromoteEligibilityTweetFields":true,"withVoice":true,"withV2Timeline":true}',
+        'features': '{"rweb_lists_timeline_redesign_enabled":true,"responsive_web_graphql_exclude_directive_enabled":true,'
+                    '"verified_phone_label_enabled":false,"creator_subscriptions_tweet_preview_api_enabled":true,'
+                    '"responsive_web_graphql_timeline_navigation_enabled":true,"responsive_web_graphql_skip_user_profile_image_extensions_enabled":false,'
+                    '"tweetypie_unmention_optimization_enabled":true,"responsive_web_edit_tweet_api_enabled":true,'
+                    '"graphql_is_translatable_rweb_tweet_is_translatable_enabled":true,"view_counts_everywhere_api_enabled":true,'
+                    '"longform_notetweets_consumption_enabled":true,"responsive_web_twitter_article_tweet_consumption_enabled":false,'
+                    '"tweet_awards_web_tipping_enabled":false,"freedom_of_speech_not_reach_fetch_enabled":true,'
+                    '"standardized_nudges_misinfo":true,"tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled":true,'
+                    '"longform_notetweets_rich_text_read_enabled":true,"longform_notetweets_inline_media_enabled":true,'
+                    '"responsive_web_media_download_video_enabled":false,"responsive_web_enhance_cards_enabled":false}',
+    }
 
     headers = {
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 YaBrowser/23.7.1.1215 Yowser/2.5 Safari/537.36',
-        'Accept': '*/*',
-        'Accept-Language': 'ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3',
         'x-guest-token': guest,
         'authorization': f'Bearer {bearer_token}'
     }
 
-    async with session.get(url=url, headers=headers, proxy_auth=proxy_auth,
+    async with session.get(url=url, params=params, headers=headers, proxy_auth=proxy_auth,
                            proxy=f'http://{proxy_host}:{proxy_port}') as response:
 
         json_content = await response.json()
@@ -67,22 +65,30 @@ async def get_last_tweets(session, proxy_auth, bearer_token, guest):
         info_tweets = json_content['data']['user']['result']['timeline_v2']['timeline']['instructions'][2]['entries']
 
         tweets = []
-        for info_tweet in info_tweets[:10]:
-            tweet = info_tweet['content']['itemContent']['tweet_results']['result']['legacy']['full_text']
-            tweets.append(tweet)
+        for info_tweet in info_tweets:
+            tweet = info_tweet['content']['itemContent']['tweet_results']['result']['legacy']
 
-        return tweets
+            tweets.append({tweet['created_at']: tweet['full_text']})
+
+        sorted_tweets = sorted(tweets, key=lambda item: extract_date(list(item.keys())[0]), reverse=True)
+
+        return sorted_tweets
 
 
 async def main():
-    async with aiohttp.ClientSession(trust_env=True) as session:
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 YaBrowser/23.7.1.1215 Yowser/2.5 Safari/537.36',
+    }
+
+    async with aiohttp.ClientSession(headers=headers) as session:
         proxy_auth = aiohttp.BasicAuth(login, password)
         bearer = await get_bearer_token(session, proxy_auth)
         guest = await get_guest_token(session, proxy_auth, bearer)
         tweets = await get_last_tweets(session, proxy_auth, bearer, guest)
 
-    for tweet in tweets:
-        print(tweet)
+    for tweet in tweets[:10]:
+        date, text = list(tweet.items())[0]
+        print(f'{text} - Опубликован: {date}')
 
 
 if __name__ == '__main__':
